@@ -1,11 +1,16 @@
 <#
 .SYNOPSIS
-    Compile and OTA-push the current ESPHome config to every target device.
+    Update, pull, build, and OTA-push the current ESPHome config to every
+    target device.
 
 .DESCRIPTION
-    Wraps `esphome update-all`, which compiles and OTA-uploads a binary for
-    each YAML file it's given. Run this after editing s10.yaml (or any
-    target file) to push the change out to every device in one go.
+    Runs the full deploy workflow in three steps:
+      1. Update to the latest bins  - `pip install --upgrade esphome`
+      2. Pull the latest source     - `git pull`
+      3. Build and push             - `esphome update-all <targets>`
+         (compiles and OTA-uploads a binary for each target file)
+    Run this after editing s10.yaml (or any target file), or any time you
+    want to make sure every device is running the latest config.
 
 .PARAMETER Targets
     Device config files to deploy. Defaults to every *-s10.yaml file in this
@@ -13,7 +18,10 @@
     file is intentionally excluded — it's not a standalone device config.
 
 .PARAMETER SkipUpgrade
-    Skip upgrading the esphome CLI itself before deploying.
+    Skip step 1: upgrading the esphome CLI itself.
+
+.PARAMETER SkipPull
+    Skip step 2: pulling the latest source with `git pull`.
 
 .EXAMPLE
     .\deploy-all.ps1
@@ -22,12 +30,13 @@
     .\deploy-all.ps1 -Targets site-a-s10.yaml
 
 .EXAMPLE
-    .\deploy-all.ps1 -SkipUpgrade
+    .\deploy-all.ps1 -SkipUpgrade -SkipPull
 #>
 [CmdletBinding()]
 param(
     [string[]]$Targets = (Get-ChildItem -Path $PSScriptRoot -Filter "*-s10.yaml" | Select-Object -ExpandProperty Name),
-    [switch]$SkipUpgrade
+    [switch]$SkipUpgrade,
+    [switch]$SkipPull
 )
 
 $ErrorActionPreference = "Stop"
@@ -38,8 +47,9 @@ if (-not $Targets -or $Targets.Count -eq 0) {
     exit 1
 }
 
+# 1. Update to the latest bins
 if (-not $SkipUpgrade) {
-    Write-Host "==> Upgrading esphome CLI..." -ForegroundColor Cyan
+    Write-Host "==> [1/3] Upgrading esphome CLI..." -ForegroundColor Cyan
     pip install --upgrade esphome
     if ($LASTEXITCODE -ne 0) {
         Write-Error "pip install --upgrade esphome failed"
@@ -47,6 +57,23 @@ if (-not $SkipUpgrade) {
     }
 }
 
-Write-Host "==> Deploying targets: $($Targets -join ', ')" -ForegroundColor Cyan
+# 2. Pull the latest source
+if (-not $SkipPull) {
+    Write-Host "==> [2/3] Pulling latest source..." -ForegroundColor Cyan
+    $null = git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "No upstream tracking branch configured -- skipping git pull. Run 'git remote add origin <url>' and 'git branch --set-upstream-to=origin/master' to enable it."
+    }
+    else {
+        git pull
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "git pull failed"
+            exit $LASTEXITCODE
+        }
+    }
+}
+
+# 3. Build and push
+Write-Host "==> [3/3] Deploying targets: $($Targets -join ', ')" -ForegroundColor Cyan
 esphome update-all @Targets
 exit $LASTEXITCODE

@@ -13,34 +13,48 @@ substitution and includes it.
 
 ## Everyday workflow
 
-Run these from the repo root.
+Run these from the repo root. Three steps: update the tool, pull the config
+source, then build and push it to the devices.
 
-**1. Pull the latest ESPHome tooling**
+### 1. Update to the latest bins
+
+This updates the `esphome` command-line tool itself (the compiler/uploader),
+not this repo's config:
 
 ```powershell
 pip install --upgrade esphome
 ```
 
+### 2. Pull the latest source
+
+Pull the latest config from git:
+
+```powershell
+git pull
+```
+
+(This repo has no remote configured yet — once one exists, `git remote add
+origin <url>` first, or `git pull origin master` explicitly.)
+
 `s10.yaml` also pulls in `github://blakadder/bluetooth-proxies/gl-s10.yaml@main`
-via `dashboard_import` and ESPHome may cache remote/external components under
-`.esphome/`. If you need to force a fresh pull of those instead of relying on
+via `dashboard_import` — that's a second, separate "source" ESPHome fetches
+on its own. ESPHome may cache it (and other remote/external components)
+under `.esphome/`; if you need to force a fresh pull instead of relying on
 the cache, wipe it first:
 
 ```powershell
 esphome clean-all site-a-s10.yaml site-b-s10.yaml
 ```
 
-**2. Validate / compile**
+Optionally validate/compile without pushing anything, to sanity-check what
+you just pulled:
 
 ```powershell
-# just check the config is valid
-esphome config site-a-s10.yaml
-
-# compile without uploading
-esphome compile site-a-s10.yaml
+esphome config site-a-s10.yaml    # just check the config is valid
+esphome compile site-a-s10.yaml   # compile without uploading
 ```
 
-**3. Push to a target**
+### 3. Build and push
 
 ```powershell
 # compile + OTA upload, one target
@@ -48,16 +62,13 @@ esphome update-all site-a-s10.yaml
 
 # compile + OTA upload + tail logs, one target
 esphome run site-a-s10.yaml
-```
 
-**4. Push to every target at once**
-
-```powershell
+# compile + OTA upload, every target at once
 esphome update-all site-a-s10.yaml site-b-s10.yaml
 ```
 
-Or use the wrapper script, which discovers every `*-s10.yaml` target file
-automatically:
+Or run all three steps in one go with the wrapper script, which discovers
+every `*-s10.yaml` target file automatically:
 
 ```powershell
 .\deploy-all.ps1
@@ -66,7 +77,8 @@ automatically:
 Options:
 
 ```powershell
-.\deploy-all.ps1 -SkipUpgrade            # skip the `pip install --upgrade esphome` step
+.\deploy-all.ps1 -SkipUpgrade            # skip step 1 (pip install --upgrade esphome)
+.\deploy-all.ps1 -SkipPull               # skip step 2 (git pull)
 .\deploy-all.ps1 -Targets site-a-s10.yaml  # deploy to just one target
 ```
 
