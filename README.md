@@ -96,6 +96,14 @@ Options:
 .\deploy-all.ps1 -Targets garage-s10.yaml   # deploy to just one target (looked up in sites/)
 ```
 
+If a build fails on Windows with `PermissionError: [WinError 5] Access is
+denied` under `.esphome\build\<node>`, the build dir has picked up the
+ReadOnly attribute and ESPHome can't delete it. `deploy-all.ps1` detects this,
+clears the attribute, deletes that (disposable) build dir, and retries just
+the failed targets once. To fix it by hand:
+`attrib -R ".esphome\build\<node>" /S /D`, `attrib -R ".esphome\build\<node>\*" /S /D`,
+then delete the folder.
+
 > Don't point `update-all` at a whole directory (`esphome update-all .`) —
 > it globs every `*.yaml` file it finds, including the shared `s10.yaml`
 > base file, which isn't a standalone device config and will just fail.

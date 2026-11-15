@@ -110,7 +110,50 @@ if (-not $Targets -or $Targets.Count -eq 0) {
     exit 1
 }
 
+# Run `esphome update-all`, echoing its output live and returning it for
+# failure inspection. Stderr is folded into the stream as plain text, and
+# ErrorActionPreference is relaxed so Windows PowerShell 5.1 doesn't turn
+# esphome's stderr lines into terminating errors.
+function Invoke-UpdateAll([string[]]$Files) {
+    $ErrorActionPreference = "Continue"
+    esphome update-all @Files 2>&1 | ForEach-Object { "$_" } | Tee-Object -Variable output | Out-Host
+    return , @($output)
+}
+
 # 3. Build and push
 Write-Host "==> [3/3] Deploying targets: $($Targets -join ', ')" -ForegroundColor Cyan
-esphome update-all @Targets
+$output = Invoke-UpdateAll $Targets
+$exitCode = $LASTEXITCODE
+if ($exitCode -eq 0) { exit 0 }
+
+# Known Windows failure: build directories end up with the ReadOnly attribute,
+# and ESPHome's clean_build can't rmdir them ("PermissionError: [WinError 5]
+# Access is denied: '...\.esphome\build\<node>\...'"). The build dir is a
+# disposable cache, so clear the attribute, delete it, and retry the failed
+# targets once.
+$lockedBuildDirs = $output |
+    Select-String -Pattern "PermissionError: \[WinError 5\].*?'(.+?\\\.esphome\\+build\\+[^\\']+)" |
+    ForEach-Object { $_.Matches[0].Groups[1].Value -replace '\\\\', '\' } |
+    Sort-Object -Unique
+if (-not $lockedBuildDirs) { exit $exitCode }
+
+foreach ($dir in $lockedBuildDirs) {
+    Write-Warning "Locked build dir (ReadOnly attribute): $dir -- clearing and deleting it."
+    if (Test-Path -LiteralPath $dir) {
+        attrib -R "$dir" /S /D | Out-Null
+        attrib -R "$dir\*" /S /D | Out-Null
+        Remove-Item -LiteralPath $dir -Recurse -Force
+    }
+}
+
+# Retry only the targets the summary reported as FAILED (all of them if the
+# summary can't be matched back to a target).
+$failedNames = $output |
+    Select-String -Pattern '^\s*-\s*(\S+\.ya?ml):\s*FAILED' |
+    ForEach-Object { Split-Path -Leaf $_.Matches[0].Groups[1].Value }
+$retryTargets = @($Targets | Where-Object { (Split-Path -Leaf $_) -in $failedNames })
+if ($retryTargets.Count -eq 0) { $retryTargets = $Targets }
+
+Write-Host "==> Retrying after cleanup: $($retryTargets -join ', ')" -ForegroundColor Cyan
+$null = Invoke-UpdateAll $retryTargets
 exit $LASTEXITCODE

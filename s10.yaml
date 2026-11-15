@@ -19,7 +19,9 @@ ethernet:
   type: IP101
   mdc_pin: GPIO23
   mdio_pin: GPIO18
-  clk_mode: GPIO17_OUT
+  clk:
+    mode: CLK_OUT
+    pin: 17
   phy_addr: 1
   power_pin: GPIO5
   manual_ip:
@@ -31,6 +33,10 @@ api:
 logger:
 ota:
   platform: esphome
+
+# Enable web server
+web_server:
+  port: 80
 
 dashboard_import:
   package_import_url: github://blakadder/bluetooth-proxies/gl-s10.yaml@main
