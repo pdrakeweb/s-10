@@ -24,8 +24,8 @@ ethernet:
   power_pin: GPIO5
   manual_ip:
     static_ip: ${ip_address} # GL-S10 IP address
-    gateway: 192.168.1.1 # Gateway
-    subnet: 255.255.0.0 # Subnet mask
+    gateway: ${gateway} # Gateway
+    subnet: ${subnet} # Subnet mask
 
 api:
 logger:

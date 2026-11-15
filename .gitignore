@@ -3,3 +3,6 @@
 # You can modify this file to suit your needs.
 /.esphome/
 /secrets.yaml
+# Real device targets live in sites/ (often a link to a private repo).
+# No trailing slash: git sees a junction/symlink as a file.
+/sites

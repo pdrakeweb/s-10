@@ -1,0 +1,8 @@
+# Example device target. Copy into sites/ (named <something>-s10.yaml) and fill in
+# your values; files in sites/ are gitignored.
+substitutions:
+  name: example-s10-bt-proxy
+  ip_address: 192.168.1.50
+  gateway: 192.168.1.1
+  subnet: 255.255.255.0
+<<: !include ../s10.yaml
